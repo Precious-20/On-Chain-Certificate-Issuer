@@ -2,7 +2,6 @@
 pragma solidity ^0.8.30;
 
 contract CertificateIssuer {
-
     error CertificateDoesNotExist();
     error CertificateAlreadyRevoked();
     error NotAuthorized();
@@ -25,34 +24,31 @@ contract CertificateIssuer {
     event IssuerRemoved(address indexed issuer);
 
     modifier onlyOwner() {
-    if (msg.sender != owner) {
+        if (msg.sender != owner) {
             revert NotAuthorized();
-    }
-    _;
+        }
+        _;
     }
 
     modifier onlyIssuer() {
-    if (
-        msg.sender != owner &&
-        !authorizedIssuers[msg.sender]
-    ) {
-        revert NotAuthorized();
+        if (msg.sender != owner && !authorizedIssuers[msg.sender]) {
+            revert NotAuthorized();
+        }
+        _;
     }
-    _;
-}
 
     constructor() {
         owner = msg.sender;
     }
 
     function authorizeIssuer(address issuer) public onlyOwner {
-    authorizedIssuers[issuer] = true;
-    emit IssuerAuthorized(issuer);
+        authorizedIssuers[issuer] = true;
+        emit IssuerAuthorized(issuer);
     }
 
     function removeIssuer(address issuer) public onlyOwner {
-    authorizedIssuers[issuer] = false;
-    emit IssuerRemoved(issuer);
+        authorizedIssuers[issuer] = false;
+        emit IssuerRemoved(issuer);
     }
 
     uint256 private nextCertificateId = 1;
@@ -68,76 +64,58 @@ contract CertificateIssuer {
         uint256 issueDate
     );
 
-    event CertificateRevoked(
-        uint256 indexed certificateId
-    );
+    event CertificateRevoked(uint256 indexed certificateId);
 
     function issueCertificate(
-    address recipient,
-    string memory recipientName,
-    string memory course,
-    string memory institution
-) public onlyIssuer {
-    uint256 certificateId = nextCertificateId;
+        address recipient,
+        string memory recipientName,
+        string memory course,
+        string memory institution
+    ) public onlyIssuer {
+        uint256 certificateId = nextCertificateId;
 
-    certificates[certificateId] = Certificate({
-        id: certificateId,
-        recipient: recipient,
-        recipientName: recipientName,
-        course: course,
-        institution: institution,
-        issueDate: block.timestamp,
-        revoked: false
-    });
+        certificates[certificateId] = Certificate({
+            id: certificateId,
+            recipient: recipient,
+            recipientName: recipientName,
+            course: course,
+            institution: institution,
+            issueDate: block.timestamp,
+            revoked: false
+        });
 
-    nextCertificateId++;
+        nextCertificateId++;
 
-    emit CertificateIssued(
-        certificateId,
-        recipient,
-        recipientName,
-        course,
-        institution,
-        block.timestamp
-    );
-}
-
-
-function verifyCertificate(uint256 certificateId)
-    public
-    view
-    returns (Certificate memory)
-{
-    if (certificateId == 0 || certificateId >= nextCertificateId) {
-        revert CertificateDoesNotExist();
+        emit CertificateIssued(certificateId, recipient, recipientName, course, institution, block.timestamp);
     }
 
-    return certificates[certificateId];
-}
+    function verifyCertificate(uint256 certificateId) public view returns (Certificate memory) {
+        if (certificateId == 0 || certificateId >= nextCertificateId) {
+            revert CertificateDoesNotExist();
+        }
 
-function isCertificateValid(uint256 certificateId)
-    public
-    view
-    returns (bool)
-{
-    if (certificateId == 0 || certificateId >= nextCertificateId) {
-        revert CertificateDoesNotExist();
+        return certificates[certificateId];
     }
 
-    return !certificates[certificateId].revoked;
-}
+    function isCertificateValid(uint256 certificateId) public view returns (bool) {
+        if (certificateId == 0 || certificateId >= nextCertificateId) {
+            revert CertificateDoesNotExist();
+        }
 
-function revokeCertificate(uint256 certificateId) public onlyOwner {
-    if (certificateId == 0 || certificateId >= nextCertificateId) {
-        revert CertificateDoesNotExist();
+        return !certificates[certificateId].revoked;
     }
 
-    if (certificates[certificateId].revoked) {
-        revert CertificateAlreadyRevoked();
+    function revokeCertificate(uint256 certificateId) public onlyOwner {
+        if (certificateId == 0 || certificateId >= nextCertificateId) {
+            revert CertificateDoesNotExist();
+        }
+
+        if (certificates[certificateId].revoked) {
+            revert CertificateAlreadyRevoked();
+        }
+
+        certificates[certificateId].revoked = true;
+
+        emit CertificateRevoked(certificateId);
     }
-
-    certificates[certificateId].revoked = true;
-
-    emit CertificateRevoked(certificateId);
-}
 }
