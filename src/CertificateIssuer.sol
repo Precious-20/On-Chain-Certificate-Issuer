@@ -3,6 +3,10 @@ pragma solidity ^0.8.30;
 
 contract CertificateIssuer {
 
+    error CertificateDoesNotExist();
+    error CertificateAlreadyRevoked();
+    error NotAuthorized();
+
     struct Certificate {
         uint256 id;
         address recipient;
@@ -13,15 +17,42 @@ contract CertificateIssuer {
         bool revoked;
     }
 
-    address public owner;
+    address public immutable owner;
+
+    mapping(address => bool) public authorizedIssuers;
+
+    event IssuerAuthorized(address indexed issuer);
+    event IssuerRemoved(address indexed issuer);
 
     modifier onlyOwner() {
-        require(msg.sender == owner, "Not authorized");
-        _;
+    if (msg.sender != owner) {
+            revert NotAuthorized();
     }
+    _;
+    }
+
+    modifier onlyIssuer() {
+    if (
+        msg.sender != owner &&
+        !authorizedIssuers[msg.sender]
+    ) {
+        revert NotAuthorized();
+    }
+    _;
+}
 
     constructor() {
         owner = msg.sender;
+    }
+
+    function authorizeIssuer(address issuer) public onlyOwner {
+    authorizedIssuers[issuer] = true;
+    emit IssuerAuthorized(issuer);
+    }
+
+    function removeIssuer(address issuer) public onlyOwner {
+    authorizedIssuers[issuer] = false;
+    emit IssuerRemoved(issuer);
     }
 
     uint256 private nextCertificateId = 1;
@@ -46,7 +77,7 @@ contract CertificateIssuer {
     string memory recipientName,
     string memory course,
     string memory institution
-) public onlyOwner {
+) public onlyIssuer {
     uint256 certificateId = nextCertificateId;
 
     certificates[certificateId] = Certificate({
@@ -77,10 +108,34 @@ function verifyCertificate(uint256 certificateId)
     view
     returns (Certificate memory)
 {
+    if (certificateId == 0 || certificateId >= nextCertificateId) {
+        revert CertificateDoesNotExist();
+    }
+
     return certificates[certificateId];
 }
 
+function isCertificateValid(uint256 certificateId)
+    public
+    view
+    returns (bool)
+{
+    if (certificateId == 0 || certificateId >= nextCertificateId) {
+        revert CertificateDoesNotExist();
+    }
+
+    return !certificates[certificateId].revoked;
+}
+
 function revokeCertificate(uint256 certificateId) public onlyOwner {
+    if (certificateId == 0 || certificateId >= nextCertificateId) {
+        revert CertificateDoesNotExist();
+    }
+
+    if (certificates[certificateId].revoked) {
+        revert CertificateAlreadyRevoked();
+    }
+
     certificates[certificateId].revoked = true;
 
     emit CertificateRevoked(certificateId);
