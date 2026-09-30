@@ -1,4 +1,4 @@
-import { ethers } from "ethers";
+﻿import { ethers } from "ethers";
 
 declare global {
   interface Window {
@@ -10,22 +10,28 @@ export function hasEthereumProvider(): boolean {
   return typeof window !== "undefined" && typeof window.ethereum !== "undefined";
 }
 
-export function getBrowserProvider(): ethers.BrowserProvider | null {
-  if (!hasEthereumProvider()) {
-    return null;
+export function getInjectedEthereum(): any {
+  if (!hasEthereumProvider()) return null;
+  const ethereum = window.ethereum;
+  if (ethereum?.providers?.length) {
+    const metaMaskProvider = ethereum.providers.find((p: any) => p.isMetaMask);
+    return metaMaskProvider || ethereum.providers[0];
   }
-  return new ethers.BrowserProvider(window.ethereum);
+  return ethereum;
 }
 
-export async function getReadOnlyProvider(rpcUrl?: string): Promise<ethers.Provider> {
-  if (rpcUrl && rpcUrl !== "TBD") {
-    return new ethers.JsonRpcProvider(rpcUrl);
+export function getBrowserProvider(): ethers.BrowserProvider | null {
+  const ethereum = getInjectedEthereum();
+  if (!ethereum) {
+    return null;
   }
-  
-  if (hasEthereumProvider()) {
-    return new ethers.BrowserProvider(window.ethereum);
-  }
+  return new ethers.BrowserProvider(ethereum);
+}
 
-  // Return fallback default provider if available or throwing informative error when called
-  throw new Error("No Web3 provider available. Please connect a browser wallet like MetaMask.");
+const FALLBACK_RPC_URL =
+  "https://eth-sepolia.g.alchemy.com/v2/alch_O3lMUYYKIRtlQdBGpNMCw";
+
+export async function getReadOnlyProvider(rpcUrl?: string): Promise<ethers.Provider> {
+  const url = rpcUrl && rpcUrl !== "TBD" ? rpcUrl : FALLBACK_RPC_URL;
+  return new ethers.JsonRpcProvider(url);
 }

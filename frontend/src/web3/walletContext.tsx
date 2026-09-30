@@ -1,17 +1,19 @@
-import React, { createContext, useContext, useEffect, useState, useCallback } from "react";
+﻿import React, { createContext, useContext, useEffect, useState, useCallback } from "react";
 import { ethers } from "ethers";
 import type { WalletState } from "../contracts/types";
-import { getBrowserProvider, hasEthereumProvider } from "./provider";
-import { isTargetNetworkSupported } from "../config/networkConfig";
+import { getBrowserProvider, getInjectedEthereum, getReadOnlyProvider, hasEthereumProvider } from "./provider";
+import { isTargetNetworkSupported, TARGET_NETWORK } from "../config/networkConfig";
 import { isContractConfigured } from "../config/contractConfig";
 import { checkIsAuthorizedIssuerOnChain, fetchContractOwnerOnChain } from "./reads";
 
 interface WalletContextType extends WalletState {
   connectWallet: () => Promise<void>;
   disconnectWallet: () => void;
+  switchNetwork: () => Promise<void>;
   getSigner: () => Promise<ethers.Signer | null>;
   getProvider: () => ethers.BrowserProvider | null;
   refreshPermissions: () => Promise<void>;
+  clearError: () => void;
 }
 
 const initialWalletState: WalletState = {
@@ -31,13 +33,19 @@ const WalletContext = createContext<WalletContextType>({
   ...initialWalletState,
   connectWallet: async () => {},
   disconnectWallet: () => {},
+  switchNetwork: async () => {},
   getSigner: async () => null,
   getProvider: () => null,
   refreshPermissions: async () => {},
+  clearError: () => {},
 });
 
 export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [state, setState] = useState<WalletState>(initialWalletState);
+
+  const clearError = useCallback(() => {
+    setState((prev) => ({ ...prev, error: null }));
+  }, []);
 
   const getProvider = useCallback((): ethers.BrowserProvider | null => {
     return getBrowserProvider();
@@ -54,12 +62,12 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   }, [getProvider]);
 
   const refreshPermissions = useCallback(async () => {
-    const provider = getProvider();
-    if (!provider || !state.address || !isContractConfigured()) {
+    if (!state.address || !isContractConfigured()) {
       return;
     }
 
     try {
+      const provider = getProvider() || (await getReadOnlyProvider(TARGET_NETWORK.rpcUrl));
       const owner = await fetchContractOwnerOnChain(provider);
       const isOwner = owner.toLowerCase() === state.address.toLowerCase();
       let isIssuer = isOwner;
@@ -74,7 +82,7 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         isIssuer,
       }));
     } catch (err) {
-      console.warn("Could not fetch contract permissions (contract may be unconfigured or un-deployed)", err);
+      console.warn("Could not fetch contract permissions", err);
     }
   }, [getProvider, state.address]);
 
@@ -99,7 +107,7 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
             isIssuer = await checkIsAuthorizedIssuerOnChain(provider, userAddress);
           }
         } catch (e) {
-          // Contract read failed
+          // Contract read failed silently
         }
       }
 
@@ -146,9 +154,12 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       const userAddress = ethers.getAddress(accounts[0]);
       await updateNetworkState(provider, userAddress);
     } catch (err: any) {
-      const friendlyError = err.code === 4001 || err.code === "ACTION_REJECTED"
-        ? "Wallet connection rejected by user."
-        : err.message || "Failed to connect wallet.";
+      let friendlyError = err.message || "Failed to connect wallet.";
+      if (err.code === 4001 || err.code === "ACTION_REJECTED") {
+        friendlyError = "Wallet connection rejected by user.";
+      } else if (err.code === -32002) {
+        friendlyError = "MetaMask notification is already pending. Please open your wallet extension to approve.";
+      }
 
       setState((prev) => ({
         ...prev,
@@ -158,13 +169,78 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     }
   };
 
+  const switchNetwork = async () => {
+    const ethereum = getInjectedEthereum();
+    if (!ethereum) return;
+    const targetChainIdHex = `0x${TARGET_NETWORK.chainId.toString(16)}`;
+
+    try {
+      await ethereum.request({
+        method: "wallet_switchEthereumChain",
+        params: [{ chainId: targetChainIdHex }],
+      });
+    } catch (switchError: any) {
+      if (switchError.code === 4902) {
+        try {
+          await ethereum.request({
+            method: "wallet_addEthereumChain",
+            params: [
+              {
+                chainId: targetChainIdHex,
+                chainName: TARGET_NETWORK.name,
+                rpcUrls: [TARGET_NETWORK.rpcUrl],
+                blockExplorerUrls: [TARGET_NETWORK.blockExplorerUrl],
+                nativeCurrency: {
+                  name: "Sepolia ETH",
+                  symbol: "ETH",
+                  decimals: 18,
+                },
+              },
+            ],
+          });
+        } catch (addError: any) {
+          setState((prev) => ({
+            ...prev,
+            error: addError.message || "Failed to add Sepolia network to wallet.",
+          }));
+        }
+      } else {
+        setState((prev) => ({
+          ...prev,
+          error: switchError.message || "Failed to switch network.",
+        }));
+      }
+    }
+  };
+
   const disconnectWallet = () => {
     setState(initialWalletState);
   };
 
-  // EIP-1193 listeners
+  // Auto-connect check on initial mount
   useEffect(() => {
-    if (!hasEthereumProvider() || !window.ethereum) return;
+    const ethereum = getInjectedEthereum();
+    if (!ethereum) return;
+
+    ethereum
+      .request({ method: "eth_accounts" })
+      .then((accounts: string[]) => {
+        if (accounts && accounts.length > 0) {
+          const provider = getBrowserProvider();
+          if (provider) {
+            updateNetworkState(provider, ethers.getAddress(accounts[0]));
+          }
+        }
+      })
+      .catch((err: any) => {
+        console.warn("Silent account check failed", err);
+      });
+  }, [updateNetworkState]);
+
+  // EIP-1193 event listeners
+  useEffect(() => {
+    const ethereum = getInjectedEthereum();
+    if (!ethereum) return;
 
     const handleAccountsChanged = (accounts: string[]) => {
       if (accounts.length === 0) {
@@ -186,13 +262,15 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       }
     };
 
-    window.ethereum.on("accountsChanged", handleAccountsChanged);
-    window.ethereum.on("chainChanged", handleChainChanged);
+    if (ethereum.on) {
+      ethereum.on("accountsChanged", handleAccountsChanged);
+      ethereum.on("chainChanged", handleChainChanged);
+    }
 
     return () => {
-      if (window.ethereum?.removeListener) {
-        window.ethereum.removeListener("accountsChanged", handleAccountsChanged);
-        window.ethereum.removeListener("chainChanged", handleChainChanged);
+      if (ethereum.removeListener) {
+        ethereum.removeListener("accountsChanged", handleAccountsChanged);
+        ethereum.removeListener("chainChanged", handleChainChanged);
       }
     };
   }, [state.address, updateNetworkState]);
@@ -203,9 +281,11 @@ export const WalletProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         ...state,
         connectWallet,
         disconnectWallet,
+        switchNetwork,
         getSigner,
         getProvider,
         refreshPermissions,
+        clearError,
       }}
     >
       {children}

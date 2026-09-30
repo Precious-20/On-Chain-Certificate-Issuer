@@ -1,6 +1,7 @@
 # Compiler files
 cache/
 out/
+.vscode/
 
 # Commonly ignored directories
 .logs/

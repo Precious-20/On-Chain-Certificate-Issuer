@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+﻿import React, { useState } from "react";
 import { ethers } from "ethers";
 import { useWallet } from "../web3/walletContext";
 import { authorizeIssuerOnChain, removeIssuerOnChain, revokeCertificateOnChain } from "../web3/writes";
@@ -465,6 +465,7 @@ export const AdminPage: React.FC = () => {
                   <span className="text-slate-400 font-medium">Smart Contract Owner</span>
                   <p className="font-mono text-slate-200 truncate">
                     {ownerAddress || "Unfetched / Contract Unconfigured"}
+                    {ownerAddress || "0xCACC3cCb64921D075a138F2B5E595B59fEa7C853"}
                   </p>
                 </div>
 
@@ -473,6 +474,7 @@ export const AdminPage: React.FC = () => {
                   <span className="text-slate-400 font-medium">Deployed Contract Address</span>
                   <p className="font-mono text-slate-200 truncate">
                     {CONTRACT_ADDRESS || "TBD (Awaiting Team A Deployment)"}
+                    {CONTRACT_ADDRESS}
                   </p>
                 </div>
               </div>

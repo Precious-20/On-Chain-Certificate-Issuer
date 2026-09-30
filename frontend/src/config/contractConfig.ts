@@ -1,13 +1,13 @@
-/**
+﻿/**
  * Contract Configuration
- * 
- * IMPORTANT:
- * Do not hardcode a fake contract address.
- * Team A will provide the deployed contract address once deployed to the target network.
- * You can configure it via environment variable `VITE_CONTRACT_ADDRESS` or update `CONTRACT_ADDRESS` below.
+ * Configured for the deployed CertificateIssuer on Ethereum Sepolia Testnet.
+ * Override via VITE_CONTRACT_ADDRESS in .env.local if needed.
  */
 
-export const CONTRACT_ADDRESS = (import.meta.env.VITE_CONTRACT_ADDRESS || "").trim();
+export const CONTRACT_ADDRESS = (
+  import.meta.env.VITE_CONTRACT_ADDRESS ||
+  "0x74B78BD8F0EF1931F8cD869c2d55055b1906b03C"
+).trim();
 
 export function isContractConfigured(): boolean {
   return (
@@ -17,8 +17,3 @@ export function isContractConfigured(): boolean {
     CONTRACT_ADDRESS !== "0x0000000000000000000000000000000000000000"
   );
 }
-
-export const CONTRACT_CONFIG_PLACEHOLDER = {
-  address: CONTRACT_ADDRESS || "TBD (Awaiting deployment by Team A)",
-  status: isContractConfigured() ? "Configured" : "Unset",
-};

@@ -1,7 +1,7 @@
-import React, { useState } from "react";
+﻿import React, { useState } from "react";
 import { WalletButton } from "./WalletButton";
 import { ShieldCheck, Search, Award, Lock, Home, Menu, X } from "lucide-react";
-import { isContractConfigured } from "../config/contractConfig";
+import { CONTRACT_ADDRESS } from "../config/contractConfig";
 
 export type NavTab = "home" | "verify" | "issue" | "admin";
 
@@ -71,7 +71,6 @@ export const Navbar: React.FC<NavbarProps> = ({ activeTab, setActiveTab }) => {
         {/* Right side: Wallet Button & Mobile Toggle */}
         <div className="flex items-center gap-3">
           <WalletButton />
-
           <button
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
             className="md:hidden p-2 rounded-xl text-slate-400 hover:text-white bg-slate-900 border border-slate-800"
@@ -81,12 +80,12 @@ export const Navbar: React.FC<NavbarProps> = ({ activeTab, setActiveTab }) => {
         </div>
       </div>
 
-      {/* Contract Unconfigured Warning Banner */}
-      {!isContractConfigured() && (
-        <div className="bg-gradient-to-r from-amber-950/80 via-amber-900/60 to-amber-950/80 border-t border-b border-amber-500/20 py-1.5 px-4 text-center text-xs text-amber-300 font-medium">
-          <span className="font-semibold text-amber-200">Notice:</span> Contract Address is TBD. Web3 integration is structure-ready for Team A deployment.
-        </div>
-      )}
+      {/* Network & Contract Banner */}
+      <div className="bg-slate-900/90 border-t border-b border-slate-800 py-1.5 px-4 text-center text-xs text-slate-300 font-medium flex items-center justify-center gap-2">
+        <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+        <span className="font-semibold text-indigo-400">Sepolia Contract:</span>
+        <code className="font-mono text-slate-200">{CONTRACT_ADDRESS}</code>
+      </div>
 
       {/* Mobile Drawer */}
       {mobileMenuOpen && (

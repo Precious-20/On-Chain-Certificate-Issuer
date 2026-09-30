@@ -1,6 +1,6 @@
-import React, { useState } from "react";
+﻿import React, { useState } from "react";
 import { useWallet } from "../web3/walletContext";
-import { Wallet, AlertTriangle, Shield, CheckCircle, LogOut, ChevronDown, Copy, Check, RefreshCw } from "lucide-react";
+import { Wallet, AlertTriangle, Shield, CheckCircle, LogOut, ChevronDown, Copy, Check, RefreshCw, X } from "lucide-react";
 
 export const WalletButton: React.FC = () => {
   const {
@@ -12,9 +12,12 @@ export const WalletButton: React.FC = () => {
     isSupportedNetwork,
     isOwner,
     isIssuer,
+    error,
     connectWallet,
     disconnectWallet,
+    switchNetwork,
     refreshPermissions,
+    clearError,
   } = useWallet();
 
   const [isOpen, setIsOpen] = useState(false);
@@ -34,14 +37,28 @@ export const WalletButton: React.FC = () => {
 
   if (!isConnected) {
     return (
-      <button
-        onClick={connectWallet}
-        disabled={isConnecting}
-        className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 disabled:bg-indigo-800 text-white font-semibold rounded-xl text-sm transition shadow-lg shadow-indigo-600/20 flex items-center gap-2"
-      >
-        <Wallet className="w-4 h-4" />
-        {isConnecting ? "Connecting Wallet..." : "Connect Wallet"}
-      </button>
+      <div className="relative inline-block">
+        <button
+          onClick={connectWallet}
+          disabled={isConnecting}
+          className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 disabled:bg-indigo-800 text-white font-semibold rounded-xl text-sm transition shadow-lg shadow-indigo-600/20 flex items-center gap-2"
+        >
+          <Wallet className="w-4 h-4" />
+          {isConnecting ? "Connecting Wallet..." : "Connect Wallet"}
+        </button>
+
+        {error && (
+          <div className="absolute right-0 mt-2 w-72 bg-rose-950/95 border border-rose-800 rounded-xl p-3 shadow-2xl z-50 text-xs text-rose-200 backdrop-blur-md flex items-start justify-between gap-2">
+            <div className="flex items-start gap-2">
+              <AlertTriangle className="w-4 h-4 text-rose-400 shrink-0 mt-0.5" />
+              <span>{error}</span>
+            </div>
+            <button onClick={clearError} className="text-rose-400 hover:text-white shrink-0">
+              <X className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        )}
+      </div>
     );
   }
 
@@ -69,12 +86,29 @@ export const WalletButton: React.FC = () => {
         <div className="absolute right-0 mt-2 w-80 bg-slate-900 border border-slate-800 rounded-2xl p-4 shadow-2xl z-50 text-left backdrop-blur-md">
           {/* Unsupported network alert */}
           {!isSupportedNetwork && (
-            <div className="mb-3 p-3 bg-rose-950/60 border border-rose-800/80 rounded-xl text-xs text-rose-300 flex items-start gap-2">
-              <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5 text-rose-400" />
-              <div>
-                <strong className="font-semibold block">Unsupported Network</strong>
-                Connected to {chainName} (Chain #{chainId}). Please switch to the correct deployment network once supplied by Team A.
+            <div className="mb-3 p-3 bg-rose-950/60 border border-rose-800/80 rounded-xl text-xs text-rose-300 space-y-2">
+              <div className="flex items-start gap-2">
+                <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5 text-rose-400" />
+                <div>
+                  <strong className="font-semibold block">Unsupported Network</strong>
+                  Connected to {chainName} (Chain #{chainId}). Please switch to Ethereum Sepolia.
+                </div>
               </div>
+              <button
+                onClick={switchNetwork}
+                className="w-full py-1.5 bg-rose-600 hover:bg-rose-500 text-white font-bold rounded-lg text-xs transition shadow"
+              >
+                Switch to Sepolia
+              </button>
+            </div>
+          )}
+
+          {error && (
+            <div className="mb-3 p-2.5 bg-rose-950/80 border border-rose-800 rounded-xl text-xs text-rose-200 flex items-center justify-between">
+              <span>{error}</span>
+              <button onClick={clearError} className="text-rose-400 hover:text-white">
+                <X className="w-3.5 h-3.5" />
+              </button>
             </div>
           )}
 

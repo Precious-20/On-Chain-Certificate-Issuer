@@ -1,8 +1,10 @@
-import React, { useState } from "react";
+﻿import React, { useState } from "react";
 import { useWallet } from "../web3/walletContext";
 import { fetchCertificateOnChain } from "../web3/reads";
 import { parseWeb3Error } from "../web3/errors";
 import { isContractConfigured } from "../config/contractConfig";
+import { TARGET_NETWORK } from "../config/networkConfig";
+import { getReadOnlyProvider } from "../web3/provider";
 import type { FormattedCertificate } from "../contracts/types";
 import { Search, Hash, ShieldCheck } from "lucide-react";
 import { LoadingState } from "../components/LoadingState";
@@ -32,9 +34,7 @@ export const VerifyPage: React.FC = () => {
     }
 
     if (!isContractConfigured()) {
-      setErrorMsg(
-        "Contract Not Configured: Deployed contract address has not been provided by Team A yet. Once deployed and configured, real contract verification will read directly from the blockchain."
-      );
+      setErrorMsg("Contract Not Configured: Deployed contract address has not been provided yet.");
       return;
     }
 
@@ -42,12 +42,8 @@ export const VerifyPage: React.FC = () => {
       setLoading(true);
       setSearchedId(trimmedId);
 
-      const provider = getProvider();
-      if (!provider) {
-        throw new Error("No Web3 provider found. Please connect your browser wallet to query the contract.");
-      }
-
-      const result = await fetchCertificateOnChain(provider, trimmedId);
+      const activeProvider = getProvider() || (await getReadOnlyProvider(TARGET_NETWORK.rpcUrl));
+      const result = await fetchCertificateOnChain(activeProvider, trimmedId);
       setCertificate(result);
     } catch (err: any) {
       const parsed = parseWeb3Error(err);
